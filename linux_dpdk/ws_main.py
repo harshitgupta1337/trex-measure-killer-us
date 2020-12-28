@@ -1184,7 +1184,8 @@ class build_option:
                   '-Werror',
                   '-Wno-literal-suffix',
                   '-Wno-sign-compare',
-                  '-Wno-strict-aliasing']
+                  '-Wno-strict-aliasing',
+                  '-Wno-maybe-uninitialized']
         if self.isIntelPlatform():
             flags += [
                       '-Wno-aligned-new'
@@ -1266,14 +1267,14 @@ def build_prog (bld, build_obj):
           target   = build_obj.get_mlx5_target()
         )
 
-        bld.shlib(
-        features='c',
-        includes = dpdk_includes_path+dpdk_includes_verb_path,
-        cflags   = (cflags + DPDK_FLAGS + build_obj.get_mlx4_flags() ),
-            use =['ibverbs', 'mlx4'],
-        source   = mlx4_dpdk.file_list(top),
-        target   = build_obj.get_mlx4_target()
-       )
+        #bld.shlib(
+        #features='c',
+        #includes = dpdk_includes_path+dpdk_includes_verb_path,
+        #cflags   = (cflags + DPDK_FLAGS + build_obj.get_mlx4_flags() ),
+        #    use =['ibverbs', 'mlx4'],
+        #source   = mlx4_dpdk.file_list(top),
+        #target   = build_obj.get_mlx4_target()
+       #)
 
     if bld.env.WITH_NTACC == True:
         bld.shlib(
@@ -1350,21 +1351,20 @@ def build(bld):
     if bld.env.NO_MLX == False:
         if bld.env['LIB_IBVERBS']:
             Logs.pprint('GREEN', 'Info: Using external libverbs.')
-            bld.read_shlib(name='ibverbs')
-            bld.read_shlib(name='mlx5')
-            bld.read_shlib(name='mlx4')
+            bld.read_shlib(name='ibverbs',paths=["/usr/lib/x86_64-linux-gnu/"])
+            bld.read_shlib(name='mlx5',paths=["/usr/lib/x86_64-linux-gnu/"])
+            #bld.read_shlib(name='mlx4')
         else:
             Logs.pprint('GREEN', 'Info: Using internal libverbs.')
             ibverbs_lib_path='external_libs/ibverbs/'
             dpdk_includes_verb_path =' \n ../external_libs/ibverbs/include/ \n'
             bld.read_shlib( name='ibverbs' , paths=[top+ibverbs_lib_path] )
             bld.read_shlib( name='mlx5',paths=[top+ibverbs_lib_path])
-            bld.read_shlib( name='mlx4',paths=[top+ibverbs_lib_path])
+            #bld.read_shlib( name='mlx4',paths=[top+ibverbs_lib_path])
             check_ibverbs_deps(bld)
 
     for obj in build_types:
         build_type(bld,obj);
-
 
 def build_info(bld):
     pass;
@@ -1420,10 +1420,10 @@ def install_single_system (bld, exec_p, build_obj):
                    where = so_path)
 
     # MLX4
-    do_create_link(src = os.path.realpath(o + build_obj.get_mlx4so_target()),
-                   name = build_obj.get_mlx4so_target(),
-                   where = so_path)
-
+#    do_create_link(src = os.path.realpath(o + build_obj.get_mlx4so_target()),
+#                   name = build_obj.get_mlx4so_target(),
+#                   where = so_path)
+#
     # BPF
     do_create_link(src   = os.path.realpath(o + build_obj.get_bpfso_target()),
                    name  = build_obj.get_bpfso_target(),
