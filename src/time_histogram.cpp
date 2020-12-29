@@ -48,7 +48,7 @@ void CTimeHistogram::Reset() {
 
 bool CTimeHistogram::Create() {
     Reset();
-    m_min_delta =10.0/1000000.0;
+    m_min_delta = 100.0/1000000000.0;
     return (true);
 }
 
@@ -69,6 +69,8 @@ bool CTimeHistogram::Add(dsec_t dt) {
     period_elem.inc_high_cnt();
 
     uint32_t d_10usec = (uint32_t)(dt*100000.0);
+    uint32_t d_1usec = (uint32_t)(dt*1000000.0);
+    uint32_t d_100nsec = (uint32_t)(dt*10000000.0);
     // 1 10-19 usec
     //,2 -20-29 usec
     //,3,
@@ -86,6 +88,18 @@ bool CTimeHistogram::Add(dsec_t dt) {
         } else {
             d_10usec = high;
         }
+    }
+
+
+    //add d_1usec to my field
+    if (d_1usec < DETAIL_HIST_SIZE) {
+	    int i1us = (int)d_1usec;  //there was -1 here! wrong!
+	    m_1us_hist[i1us]++;
+    }
+
+    if (d_100nsec < DETAIL_HIST_SIZE*100) {
+	    int i100ns = (int)d_100nsec;
+	    m_100ns_hist[i100ns]++;
     }
 
     return true;
@@ -252,5 +266,17 @@ void CTimeHistogram::dump_json(Json::Value & json, bool add_histogram) {
             json["histogram"]["0"] = Json::Value::UInt64(short_latency);
         }
     }
+
+    
+    for (i = 0; i < DETAIL_HIST_SIZE; i++) {
+	    std::string key1us = static_cast<std::ostringstream*>( &(std::ostringstream() << int(i) ) )->str();
+	    json["histogram1us"][key1us] = Json::Value::UInt64(m_1us_hist[i]);
+    }
+
+    for (i = 0; i < DETAIL_HIST_SIZE; i++) {
+	    std::string key100ns = static_cast<std::ostringstream*>( &(std::ostringstream() << int((i+1)*100) ) )->str();
+	    json["histogram100ns"][key100ns] = Json::Value::UInt64(m_100ns_hist[i]);
+    }
+    
 }
 

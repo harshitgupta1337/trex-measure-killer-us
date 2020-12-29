@@ -21,7 +21,7 @@ class STLS1(object):
         pkt = STLPktBuilder(pkt = base_pkt/pad)
 
         return [STLStream(packet = pkt,
-                          mode = STLTXCont(pps=1000),
+                          mode = STLTXCont(pps=744047),
                           flow_stats = STLFlowLatencyStats(pg_id = self.pg_id))
                ]
 

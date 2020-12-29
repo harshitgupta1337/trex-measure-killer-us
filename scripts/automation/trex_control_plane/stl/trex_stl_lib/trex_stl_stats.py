@@ -1243,7 +1243,6 @@ class CLatencyStats(CTRexStats):
 
         # we care only about the current active keys
         pg_ids = list(filter(is_intable, snapshot.keys()))
-
         for pg_id in pg_ids:
             current_pg = snapshot.get(pg_id)
             int_pg_id = int(pg_id)
@@ -1257,6 +1256,15 @@ class CLatencyStats(CTRexStats):
                         output[int_pg_id]['latency'][field] = current_pg['latency'][field]
                     else:
                         output[int_pg_id]['latency'][field] = StatNotAvailable(field)
+
+                if 'histogram1us' in current_pg['latency']:
+                    output[int_pg_id]['latency']['histogram1us'] = {int(elem): current_pg['latency']['histogram1us'][elem] for elem in current_pg['latency']['histogram1us']}
+                else:
+                    print ("histogram1us not in current_pg[\"latency\"]")
+                if 'histogram100ns' in current_pg['latency']:
+                    output[int_pg_id]['latency']['histogram100ns'] = {int(elem): current_pg['latency']['histogram100ns'][elem] for elem in current_pg['latency']['histogram100ns']}
+                else:
+                    print ("histogram100ns not in current_pg[\"latency\"]")
 
                 if 'histogram' in current_pg['latency']:
                     output[int_pg_id]['latency']['histogram'] = {int(elem): current_pg['latency']['histogram'][elem]
@@ -1731,6 +1739,26 @@ class CPgIdStats(object):
                 else:
                     lat['latency']['total_min'] = StatNotAvailable('total_min')
                     lat['latency']['histogram'] = {}
+
+                if 'histogram100ns' in ans_dict['latency'][pg_id]['lat']:
+                    #translate histogram numbers from string to integers
+                    lat['latency']['histogram100ns'] = {
+                                        int(elem): ans_dict['latency'][pg_id]['lat']['histogram100ns'][elem]
+                                         for elem in ans_dict['latency'][pg_id]['lat']['histogram100ns']
+                    }
+                    min_val = min(lat['latency']['histogram100ns'])
+                else:
+                    lat['latency']['histogram100ns'] = {}
+
+                if 'histogram1us' in ans_dict['latency'][pg_id]['lat']:
+                    #translate histogram numbers from string to integers
+                    lat['latency']['histogram1us'] = {
+                                        int(elem): ans_dict['latency'][pg_id]['lat']['histogram1us'][elem]
+                                         for elem in ans_dict['latency'][pg_id]['lat']['histogram1us']
+                    }
+                    min_val = min(lat['latency']['histogram1us'])
+                else:
+                    lat['latency']['histogram1us'] = {}
 
         # translate json 'flow_stats' to python API 'flow_stats'
         if 'flow_stats' in ans_dict and ans_dict['flow_stats'] is not None:

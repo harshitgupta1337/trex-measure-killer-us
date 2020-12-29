@@ -67,6 +67,7 @@ public:
         HISTOGRAM_SIZE=9,
         HISTOGRAM_SIZE_LOG=5,
         HISTOGRAM_QUEUE_SIZE=14,
+	DETAIL_HIST_SIZE=400,
     };
     bool Create(void);
     void Delete();
@@ -113,6 +114,8 @@ private:
     dsec_t   m_average; /* moving average */
     uint32_t m_win_cnt;
     dsec_t   m_max_ar[HISTOGRAM_QUEUE_SIZE]; // Array of maximum latencies for previous periods
+    uint64_t m_1us_hist[DETAIL_HIST_SIZE]; //detailed hist 
+    uint64_t m_100ns_hist[DETAIL_HIST_SIZE];
     uint64_t m_hcnt[HISTOGRAM_SIZE_LOG][HISTOGRAM_SIZE] __rte_cache_aligned ;
 };
 
