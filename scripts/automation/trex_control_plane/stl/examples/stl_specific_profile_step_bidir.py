@@ -114,18 +114,19 @@ def create_steps(outfile, bidir, low_tput, high_tput, pps, levels, profile, dura
     print ("Enforcing mult %s on directions %s"%(mult, str(directions)))
     client.start(ports = directions, mult = mult, duration = total_flow_time)
 
+    sleep_step_secs = 2
     sleep_time = 0
     for bw in traffic_bws:
         while sleep_time < duration:
             client.clear_stats()
-            time.sleep(0.5)
+            time.sleep(sleep_step_secs)
             time_ms = int(round(time.time() * 1000))
             data = {}
             data["ts"] = time_ms
             data["stats"] = client.get_stats()
             f.write(json.dumps(data))
             f.write("\n")
-            sleep_time += 0.5
+            sleep_time += sleep_step_secs
         sleep_time = 0
         mult = "%d%s"%(bw, unit)
         print ("Enforcing mult %s on directions %s"%(mult, str(directions)))
@@ -138,14 +139,14 @@ def create_steps(outfile, bidir, low_tput, high_tput, pps, levels, profile, dura
         bw = traffic_bws[idx]
         while sleep_time < duration:
             client.clear_stats()
-            time.sleep(0.5)
+            time.sleep(sleep_step_secs)
             time_ms = int(round(time.time() * 1000))
             data = {}
             data["ts"] = time_ms
             data["stats"] = client.get_stats()
             f.write(json.dumps(data))
             f.write("\n")
-            sleep_time += 0.5
+            sleep_time += sleep_step_secs
         sleep_time = 0
         mult = "%d%s"%(bw, unit)
         print ("Enforcing mult %s on directions %s"%(mult, str(directions)))
