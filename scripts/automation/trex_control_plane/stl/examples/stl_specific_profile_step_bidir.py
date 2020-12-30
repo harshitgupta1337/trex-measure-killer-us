@@ -117,6 +117,7 @@ def create_steps(outfile, bidir, low_tput, high_tput, pps, levels, profile, dura
     sleep_time = 0
     for bw in traffic_bws:
         while sleep_time < duration:
+            client.clear_stats()
             time.sleep(0.5)
             time_ms = int(round(time.time() * 1000))
             data = {}
@@ -136,6 +137,7 @@ def create_steps(outfile, bidir, low_tput, high_tput, pps, levels, profile, dura
         idx = len(traffic_bws)-1-i
         bw = traffic_bws[idx]
         while sleep_time < duration:
+            client.clear_stats()
             time.sleep(0.5)
             time_ms = int(round(time.time() * 1000))
             data = {}

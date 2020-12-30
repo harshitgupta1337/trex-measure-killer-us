@@ -44,6 +44,8 @@ void CTimeHistogram::Reset() {
             m_hcnt[j][i] = 0;
         }
     }
+    memset(&m_1us_hist[0], 0, sizeof(m_1us_hist));
+    memset(&m_100ns_hist[0], 0, sizeof(m_100ns_hist));
 }
 
 bool CTimeHistogram::Create() {
