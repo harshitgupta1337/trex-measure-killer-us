@@ -72,7 +72,7 @@ bool CTimeHistogram::Add(dsec_t dt) {
 
     uint32_t d_10usec = (uint32_t)(dt*100000.0);
     uint32_t d_1usec = (uint32_t)(dt*1000000.0);
-    uint32_t d_100nsec = (uint32_t)(dt*10000000.0);
+//    uint32_t d_100nsec = (uint32_t)(dt*10000000.0);
     // 1 10-19 usec
     //,2 -20-29 usec
     //,3,
@@ -92,17 +92,17 @@ bool CTimeHistogram::Add(dsec_t dt) {
         }
     }
 
-
+    //printf ("d_1usec = %d\n", d_1usec);
     //add d_1usec to my field
     if (d_1usec < DETAIL_HIST_SIZE) {
 	    int i1us = (int)d_1usec;  //there was -1 here! wrong!
 	    m_1us_hist[i1us]++;
     }
-
+	/*
     if (d_100nsec < DETAIL_HIST_SIZE*100) {
 	    int i100ns = (int)d_100nsec;
 	    m_100ns_hist[i100ns]++;
-    }
+    }*/
 
     return true;
 }
