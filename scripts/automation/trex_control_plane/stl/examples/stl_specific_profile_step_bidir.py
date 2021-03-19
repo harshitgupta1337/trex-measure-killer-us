@@ -58,7 +58,7 @@ def create_pkt (size, vm, vlan):
     pkt = STLPktBuilder(pkt = base_pkt/pad, vm = vm)
     return pkt
 
-def create_steps(outfile, bidir, low_tput, high_tput, pps, levels, profile, duration = 10, vlan=None):
+def create_steps(outfile, bidir, low_tput, high_tput, pps, levels, profile, aggr_metrics, no_scale_down, duration = 10, vlan=None):
     client = STLClient(server=t_global.args.ip)
     client.connect()
     if bidir:
@@ -90,7 +90,6 @@ def create_steps(outfile, bidir, low_tput, high_tput, pps, levels, profile, dura
     client.clear_stats()
 
     ramp_up_time = 15 #seconds
-    ramp_down_time = 15 #seconds
 
     traffic_bws = []
     per_level_diff = (high_tput - low_tput)/float(levels)
@@ -105,7 +104,10 @@ def create_steps(outfile, bidir, low_tput, high_tput, pps, levels, profile, dura
 
     print (traffic_bws)
     print (unit)
-    total_flow_time = ramp_up_time + ramp_down_time + duration*(levels*2 + 1)
+    if no_scale_down:
+        total_flow_time = ramp_up_time + duration*levels
+    else:
+        total_flow_time = ramp_up_time + duration*(levels*2 + 1)
 
     f = open(outfile, "w")
 
@@ -113,48 +115,69 @@ def create_steps(outfile, bidir, low_tput, high_tput, pps, levels, profile, dura
     mult = "%d%s"%(low_tput, unit)
     print ("Enforcing mult %s on directions %s"%(mult, str(directions)))
     client.start(ports = directions, mult = mult, duration = total_flow_time)
+    time.sleep(ramp_up_time)
+
+    client.clear_stats()
 
     sleep_step_secs = 2
     sleep_time = 0
     for bw in traffic_bws:
         while sleep_time < duration:
-            client.clear_stats()
+            if not aggr_metrics:
+                client.clear_stats()
+
             time.sleep(sleep_step_secs)
-            time_ms = int(round(time.time() * 1000))
-            data = {}
-            data["ts"] = time_ms
-            data["stats"] = client.get_stats()
-            f.write(json.dumps(data))
-            f.write("\n")
             sleep_time += sleep_step_secs
+
+            if not aggr_metrics:
+                time_ms = int(round(time.time() * 1000))
+                data = {}
+                data["ts"] = time_ms
+                data["stats"] = client.get_stats()
+                f.write(json.dumps(data))
+                f.write("\n")
         sleep_time = 0
         mult = "%d%s"%(bw, unit)
         print ("Enforcing mult %s on directions %s"%(mult, str(directions)))
         for d in directions:
             client.update_line("--port %d -m %s"%(d, mult))
 
-    sleep_time = 0
-    for i in range(len(traffic_bws)):
-        idx = len(traffic_bws)-1-i
-        bw = traffic_bws[idx]
-        while sleep_time < duration:
-            client.clear_stats()
-            time.sleep(sleep_step_secs)
-            time_ms = int(round(time.time() * 1000))
-            data = {}
-            data["ts"] = time_ms
-            data["stats"] = client.get_stats()
-            f.write(json.dumps(data))
-            f.write("\n")
-            sleep_time += sleep_step_secs
+    if not no_scale_down:
         sleep_time = 0
-        mult = "%d%s"%(bw, unit)
-        print ("Enforcing mult %s on directions %s"%(mult, str(directions)))
-        for d in directions:
-            client.update_line("--port %d -m %s"%(d, mult))
+        for i in range(len(traffic_bws)):
+            idx = len(traffic_bws)-1-i
+            bw = traffic_bws[idx]
+            while sleep_time < duration:
+                if not aggr_metrics:
+                    client.clear_stats()
+    
+                time.sleep(sleep_step_secs)
+                sleep_time += sleep_step_secs
+    
+                if not aggr_metrics:
+                    time_ms = int(round(time.time() * 1000))
+                    data = {}
+                    data["ts"] = time_ms
+                    data["stats"] = client.get_stats()
+                    f.write(json.dumps(data))
+                    f.write("\n")
+            sleep_time = 0
+            mult = "%d%s"%(bw, unit)
+            print ("Enforcing mult %s on directions %s"%(mult, str(directions)))
+            for d in directions:
+                client.update_line("--port %d -m %s"%(d, mult))
 
     # block until done
     client.wait_on_traffic(ports = directions)
+
+    if aggr_metrics:
+        time_ms = int(round(time.time() * 1000))
+        data = {}
+        data["ts"] = time_ms
+        data["stats"] = client.get_stats()
+        f.write(json.dumps(data))
+        f.write("\n")
+
     f.close()
 
     client.disconnect()
@@ -207,6 +230,18 @@ def process_options ():
                         help='Output file to write the stats to',
                         default="/tmp/test.out"
                         )
+    parser.add_argument("--aggr-metrics",
+            dest="aggr_metrics",
+            help='Aggregate metrics over the entire run',
+            action='store_true',
+            default=False
+            )
+    parser.add_argument("--no-scale-down",
+            dest="no_scale_down",
+            help='Add this flag to prevent traffic rate from going down after peak. Cuts off traffic at peak.',
+            action='store_true',
+            default=False
+            )
     parser.add_argument("--bidirectional",
             dest="bidir",
             help='Generate traffic in both directions',
@@ -240,7 +275,9 @@ def main():
                  bidir=t_global.args.bidir,
                  pps=True,
                  vlan = t_global.args.vlan,
-                 profile = profile
+                 profile = profile,
+                 aggr_metrics=t_global.args.aggr_metrics,
+                 no_scale_down=t_global.args.no_scale_down
                  )
 
 #    outfile, bidir, low_rate, high_rate, pps, levels, duration = 10, vlan=None
