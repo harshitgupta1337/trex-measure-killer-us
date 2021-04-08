@@ -58,7 +58,7 @@ def create_pkt (size, vm, vlan):
     pkt = STLPktBuilder(pkt = base_pkt/pad, vm = vm)
     return pkt
 
-def create_steps(outfile, bidir, low_tput, high_tput, pps, levels, profile, aggr_metrics, no_scale_down, sleep_step_secs, duration = 10, vlan=None):
+def create_steps(outfile, bidir, low_tput, high_tput, pps, levels, profile, freqs, core, dut, vlan=None, duration = 10):
     client = STLClient(server=t_global.args.ip)
     client.connect()
     if bidir:
@@ -86,7 +86,6 @@ def create_steps(outfile, bidir, low_tput, high_tput, pps, levels, profile, aggr
         latency_pgids.append(latency_pgid)
         client.add_streams(streams, ports=[direction])
 
-
     client.clear_stats()
 
     ramp_up_time = 15 #seconds
@@ -104,10 +103,9 @@ def create_steps(outfile, bidir, low_tput, high_tput, pps, levels, profile, aggr
 
     print (traffic_bws)
     print (unit)
-    if no_scale_down:
-        total_flow_time = ramp_up_time + duration*levels
-    else:
-        total_flow_time = ramp_up_time + duration*(levels*2 + 1)
+    init_sleep = 15
+    total_flow_time = 2*ramp_up_time + (duration+init_sleep)*(levels+1)*len(freqs)
+    print ("Total flow time = %d"%total_flow_time)
 
     f = open(outfile, "w")
 
@@ -119,68 +117,38 @@ def create_steps(outfile, bidir, low_tput, high_tput, pps, levels, profile, aggr
 
     client.clear_stats()
 
-    sleep_time = 0
     for bw in traffic_bws:
-        sleep_time = 0
         mult = "%d%s"%(bw, unit)
         print ("Enforcing mult %s on directions %s"%(mult, str(directions)))
         for d in directions:
             client.update_line("--port %d -m %s"%(d, mult))
-        while sleep_time < duration:
-            if not aggr_metrics:
-                client.clear_stats()
-                data = {}
-                data["init_stats"] = client.get_stats()
 
-            time.sleep(sleep_step_secs)
-            sleep_time += sleep_step_secs
+        for freq in freqs:
+            freq_str = "%.1f"%freq
 
-            if not aggr_metrics:
-                time_ms = int(round(time.time() * 1000))
-                data["ts"] = time_ms
-                data["final_stats"] = client.get_stats()
-                data["bw"] = bw
-                f.write(json.dumps(data))
-                f.write("\n")
+            # Set the frequency of the DUT core at this
+            print ("Setting CPU frequency of core %s on DUT %s to %s"%(core, dut, freq_str))
+            os.system("/home/harshit/dpdkpowermgmt/monitor_scripts/utilization/utils/set_dut_core_freq.sh %s %s %s"%(dut, core, freq_str))
 
-    if not no_scale_down:
-        sleep_time = 0
-        for i in range(len(traffic_bws)):
-            idx = len(traffic_bws)-1-i
-            bw = traffic_bws[idx]
-            sleep_time = 0
-            mult = "%d%s"%(bw, unit)
-            print ("Enforcing mult %s on directions %s"%(mult, str(directions)))
-            for d in directions:
-                client.update_line("--port %d -m %s"%(d, mult))
-            while sleep_time < duration:
-                if not aggr_metrics:
-                    client.clear_stats()
-                    data = {}
-                    data["init_stats"] = client.get_stats()
-    
-                time.sleep(sleep_step_secs)
-                sleep_time += sleep_step_secs
-    
-                if not aggr_metrics:
-                    time_ms = int(round(time.time() * 1000))
-                    data["ts"] = time_ms
-                    data["final_stats"] = client.get_stats()
-                    data["bw"] = bw
-                    f.write(json.dumps(data))
-                    f.write("\n")
+
+            data = {}
+
+            time.sleep(init_sleep)
+            client.clear_stats()
+            data["init_stats"] = client.get_stats()
+
+            time.sleep(duration)
+
+            time_ms = int(round(time.time() * 1000))
+            data["ts"] = time_ms
+            data["final_stats"] = client.get_stats()
+            data["bw"] = bw
+            data["freq"] = freq
+            f.write(json.dumps(data))
+            f.write("\n")
 
     # block until done
     client.wait_on_traffic(ports = directions)
-
-    if aggr_metrics:
-        time_ms = int(round(time.time() * 1000))
-        data = {}
-        data["ts"] = time_ms
-        data["stats"] = client.get_stats()
-        data["bw"] = bw
-        f.write(json.dumps(data))
-        f.write("\n")
 
     f.close()
 
@@ -193,18 +161,18 @@ def create_steps(outfile, bidir, low_tput, high_tput, pps, levels, profile, aggr
 
 def process_options ():
     parser = argparse.ArgumentParser();
-    parser.add_argument("--ip",dest="ip",help='remote trex ip default local',default="127.0.0.1",type = str)
+    parser.add_argument("--ip", dest="ip", help='remote trex ip default local', default="127.0.0.1", type = str)
     parser.add_argument('-d','--duration-per-level',dest='duration',help='duration in second ',default=10,type = int,)
-    parser.add_argument('-H','--high-tput',dest='high_tput', help='high throughput',default="1024",type=int)
-    parser.add_argument('-l','--low-tput',dest='low_tput',help='low throughput ',default="1",type=int)
-    parser.add_argument('-L','--levels',dest='levels',help='Number of levels between low and high throughput',default="16",type=int)
-    parser.add_argument('-O','--out-file',dest='outfile',help='Output file to write the stats to',default="/tmp/test.out")
-    parser.add_argument("--aggr-metrics",dest="aggr_metrics",help='Aggregate metrics over the entire run',action='store_true',default=False)
-    parser.add_argument("--no-scale-down",dest="no_scale_down",help='Add this flag to prevent traffic rate from going down after peak. Cuts off traffic at peak.',action='store_true',default=False)
+    parser.add_argument('-H','--high-tput', dest='high_tput',help='high throughput',default="1024",type=int)
+    parser.add_argument('-l','--low-tput', dest='low_tput',help='low throughput ',default="1",type=int)
+    parser.add_argument('-L','--levels', dest='levels',help='Number of levels between low and high throughput',default="16",type=int)
+    parser.add_argument('-O','--out-file', dest='outfile',help='Output file to write the stats to',default="/tmp/test.out")
     parser.add_argument("--bidirectional",dest="bidir",help='Generate traffic in both directions',action='store_true')
     parser.add_argument("--vlan",dest="vlan",help='VLAN ID',default=None,type = int)
-    parser.add_argument("--imix-profile",dest="imix_profile",help='IMIX profile path',type = str,required = True) 
-    parser.add_argument("--sleep-step-secs",dest="sleep_step_secs",help='Seconds to sleep between collecting metrics',default=5, type=int)
+    parser.add_argument("--imix-profile",dest="imix_profile",help='IMIX profile path',type = str,required = True)
+    parser.add_argument("--core",dest="core",help='CPU core running packet processing',type = str,required = True)
+    parser.add_argument("--dut",dest="dut",help='Hostname or IP of DUT server',type = str,required = True)
+    parser.add_argument("--freqs",dest="freqs",help='Allowed core frequencies',type = float,nargs="*",required = True)
 
     t_global.args = parser.parse_args();
     print(t_global.args)
@@ -221,9 +189,9 @@ def main():
                  pps=True,
                  vlan = t_global.args.vlan,
                  profile = profile,
-                 aggr_metrics=t_global.args.aggr_metrics,
-                 no_scale_down=t_global.args.no_scale_down
-                 sleep_step_secs=t_global.args.sleep_step_secs
+                 freqs = t_global.args.freqs,
+                 core=t_global.args.core,
+                 dut=t_global.args.dut
                  )
 
 if __name__ == "__main__":

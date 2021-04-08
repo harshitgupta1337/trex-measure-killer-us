@@ -98,6 +98,10 @@ def start_experiment(rate, duration, profile, outfile, kpps, bidir=True, vlan=No
     elif kpps:
         mult = "%fkpps"%kpps
 
+    # Launch warmup traffic
+    client.start(ports = directions, mult=mult, duration=30) # warmup duration is 30 secs # TODO Make this config
+    client.wait_on_traffic(ports = directions)
+
     client.clear_stats()
     client.start(ports = directions, mult=mult, duration=duration)
     client.wait_on_traffic(ports = directions)
